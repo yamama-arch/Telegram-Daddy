@@ -1,5 +1,6 @@
 from workers import WorkerEntrypoint, Response
 import json
+from js import fetch
 
 
 class Default(WorkerEntrypoint):
@@ -29,27 +30,18 @@ class Default(WorkerEntrypoint):
 
         token = self.env.TELEGRAM_BOT_TOKEN
 
-        await self._send_message(token, chat_id, reply)
-
-        return Response("OK")
-
-    async def _send_message(self, token, chat_id, text):
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-
-        body = json.dumps({
-            "chat_id": chat_id,
-            "text": text
-        })
-
-        from js import fetch
-
         await fetch(
-            url,
+            f"https://api.telegram.org/bot{token}/sendMessage",
             {
                 "method": "POST",
                 "headers": {
                     "Content-Type": "application/json"
                 },
-                "body": body
+                "body": json.dumps({
+                    "chat_id": chat_id,
+                    "text": reply
+                })
             }
         )
+
+        return Response("OK")
