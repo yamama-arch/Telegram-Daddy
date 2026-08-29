@@ -1,32 +1,55 @@
-import os
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+from workers import WorkerEntrypoint, Response
+import json
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "I'm alive! 🤖 Send me a message."
-    )
+class Default(WorkerEntrypoint):
+    async def fetch(self, request):
+        if request.method != "POST":
+            return Response("Telegram bot is alive.")
 
+        update = await request.json()
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Commands:\n/start - Start the bot\n/help - Show this help"
-    )
+        message = update.get("message", {})
+        chat = message.get("chat", {})
+        text = message.get("text", "")
 
+        if not chat:
+            return Response("OK")
 
-async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        f"You said: {update.message.text}"
-    )
+        chat_id = chat.get("id")
 
+        if text == "/start":
+            reply = "I'm alive! 🤖"
+        elif text == "/help":
+            reply = "/start — start the bot\n/help — show help"
+        elif text:
+            reply = f"You said: {text}"
+        else:
+            return Response("OK")
 
-TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+        token = self.env.TELEGRAM_BOT_TOKEN
 
-app = Application.builder().token(TOKEN).build()
+        await self._send_message(token, chat_id, reply)
 
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("help", help_command))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+        return Response("OK")
 
-app.run_polling()
+    async def _send_message(self, token, chat_id, text):
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+
+        body = json.dumps({
+            "chat_id": chat_id,
+            "text": text
+        })
+
+        from js import fetch
+
+        await fetch(
+            url,
+            {
+                "method": "POST",
+                "headers": {
+                    "Content-Type": "application/json"
+                },
+                "body": body
+            }
+        )
